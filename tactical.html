@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BKK Air Force One - Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- เพิ่มห้องสมุดวาดกราฟ Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-black text-orange-500 font-sans p-4 pb-10">
+
+    <div class="max-w-md mx-auto space-y-4">
+        <header class="text-center pb-4 border-b border-orange-900">
+            <h1 class="font-bold text-orange-500 tracking-[0.2em] text-lg uppercase">BKK Air Force One</h1>
+            <p id="status" class="text-[9px] text-orange-700 uppercase mt-1 tracking-widest">กำลังสร้างกราฟพยากรณ์...</p>
+        </header>
+
+        <!-- พื้นที่วางกราฟ -->
+        <div class="bg-neutral-900 p-4 rounded-xl border border-orange-900">
+            <h2 class="font-bold text-[10px] uppercase text-orange-700 tracking-widest mb-4 border-l-2 border-orange-700 pl-2">Probability Trend (แนวโน้มโอกาสฝน)</h2>
+            <canvas id="rainChart" height="150"></canvas>
+        </div>
+
+        <!-- กล่อง Status -->
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-neutral-900 p-4 rounded-xl border border-orange-900 text-center">
+                <div class="text-[10px] uppercase text-gray-400 mb-1">ฝนปัจจุบัน</div>
+                <div id="cur-rain" class="text-2xl font-bold text-blue-400">-</div>
+            </div>
+            <div class="bg-neutral-900 p-4 rounded-xl border border-orange-900 text-center">
+                <div class="text-[10px] uppercase text-gray-400 mb-1">โอกาสปัจจุบัน</div>
+                <div id="cur-prob" class="text-2xl font-bold text-cyan-400">-</div>
+            </div>
+        </div>
+
+        <button onclick="location.reload()" class="w-full mt-4 bg-orange-900 py-3 rounded-xl text-xs font-bold uppercase text-white hover:bg-orange-800">รีเฟรชข้อมูล</button>
+    </div>
+
+<script>
+async function loadTacticalData() {
+    try {
+        // ดึงย้อนหลัง 12 และล่วงหน้า 12
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=13.75&longitude=100.50&hourly=precipitation_probability&past_hours=12&forecast_hours=12&timezone=Asia%2FBangkok';
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        let labels = [];
+        let rainData = [];
+        for(let i = 0; i < data.hourly.time.length; i++) {
+            let d = new Date(data.hourly.time[i]);
+            labels.push(d.getHours() + ':00');
+            rainData.push(data.hourly.precipitation_probability[i]);
+        }
+
+        const ctx = document.getElementById('rainChart').getContext('2d');
+        const currentIdx = 12; // จุดตัดเวลาใหม่ที่ 12
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: rainData,
+                    borderColor: '#38bdf8',
+                    borderWidth: 3,
+                    fill: true,
+                    backgroundColor: (ctx) => ctx.raw > 50 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(56, 189, 248, 0.1)',
+                    segment: { borderColor: (ctx) => ctx.p1.raw > 50 ? '#ef4444' : '#38bdf8' },
+                    pointBackgroundColor: (ctx) => ctx.dataIndex < currentIdx ? '#6b7280' : '#f97316',
+                    pointRadius: (ctx) => ctx.dataIndex === currentIdx ? 6 : 3,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+                scales: { 
+                    y: { beginAtZero: true, max: 100, ticks: { color: '#666', font: {size: 9} } }, 
+                    x: { ticks: { color: '#666', font: {size: 8}, maxRotation: 45 } } 
+                }
+            }
+        });
+
+        document.getElementById('cur-rain').innerText = data.current?.precipitation || "0.0";
+        document.getElementById('cur-prob').innerText = data.hourly.precipitation_probability[currentIdx] + "%";
+        document.getElementById('status').innerText = "SYSTEMS ONLINE | 12H-12H TACTICAL";
+
+    } catch (e) {
+        document.getElementById('status').innerText = "ERROR LOADING DATA";
+    }
+}
+loadTacticalData();
+</script>
+</body>
+</html>
