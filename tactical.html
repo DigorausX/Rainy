@@ -22,14 +22,25 @@
             <canvas id="rainChart" height="150"></canvas>
         </div>
 
+        <!-- กล่อง Status -->
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-neutral-900 p-4 rounded-xl border border-orange-900 text-center">
+                <div class="text-[10px] uppercase text-gray-400 mb-1">ฝนปัจจุบัน</div>
+                <div id="cur-rain" class="text-2xl font-bold text-blue-400">-</div>
+            </div>
+            <div class="bg-neutral-900 p-4 rounded-xl border border-orange-900 text-center">
+                <div class="text-[10px] uppercase text-gray-400 mb-1">โอกาสปัจจุบัน</div>
+                <div id="cur-prob" class="text-2xl font-bold text-cyan-400">-</div>
+            </div>
+        </div>
+
         <button onclick="location.reload()" class="w-full mt-4 bg-orange-900 py-3 rounded-xl text-xs font-bold uppercase text-white hover:bg-orange-800">รีเฟรชข้อมูล</button>
     </div>
 
 <script>
 async function loadTacticalData() {
     try {
-        // ดึงย้อนหลัง 12 และล่วงหน้า 12
-        const url = 'https://api.open-meteo.com/v1/forecast?latitude=13.75&longitude=100.50&hourly=precipitation_probability&past_hours=12&forecast_hours=12&timezone=Asia%2FBangkok';
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=13.75&longitude=100.50&current=precipitation&hourly=precipitation_probability&past_hours=8&forecast_hours=8&timezone=Asia%2FBangkok';
         const res = await fetch(url);
         const data = await res.json();
         
@@ -41,21 +52,30 @@ async function loadTacticalData() {
             rainData.push(data.hourly.precipitation_probability[i]);
         }
 
+        // --- เพิ่มส่วนนี้ที่หายไป ---
         const ctx = document.getElementById('rainChart').getContext('2d');
-        const currentIdx = 12; // จุดตัดเวลาใหม่ที่ 12
+        const currentIdx = 8; 
 
         new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
                 datasets: [{
+                    label: 'โอกาสเกิดฝน (%)',
                     data: rainData,
                     borderColor: '#38bdf8',
                     borderWidth: 3,
                     fill: true,
-                    backgroundColor: (ctx) => ctx.raw > 50 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(56, 189, 248, 0.1)',
-                    segment: { borderColor: (ctx) => ctx.p1.raw > 50 ? '#ef4444' : '#38bdf8' },
-                    pointBackgroundColor: (ctx) => ctx.dataIndex < currentIdx ? '#6b7280' : '#f97316',
+                    backgroundColor: (ctx) => {
+                        const value = ctx.raw || 0;
+                        return value > 50 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(56, 189, 248, 0.1)';
+                    },
+                    segment: {
+                        borderColor: (ctx) => ctx.p1.raw > 50 ? '#ef4444' : '#38bdf8',
+                    },
+                    pointBackgroundColor: (ctx) => {
+                        return ctx.dataIndex < currentIdx ? '#6b7280' : '#f97316';
+                    },
                     pointRadius: (ctx) => ctx.dataIndex === currentIdx ? 6 : 3,
                     tension: 0.3
                 }]
@@ -65,25 +85,21 @@ async function loadTacticalData() {
                 plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
                 scales: { 
                     y: { beginAtZero: true, max: 100, ticks: { color: '#666', font: {size: 9} } }, 
-                    x: { ticks: { color: '#666', font: {size: 8}, maxRotation: 45 } } 
+                    x: { ticks: { color: '#666', font: {size: 8}, maxRotation: 0 } } 
                 }
             }
         });
 
-        document.getElementById('cur-rain').innerText = data.current?.precipitation || "0.0";
+        document.getElementById('cur-rain').innerText = data.current.precipitation + " mm/h";
         document.getElementById('cur-prob').innerText = data.hourly.precipitation_probability[currentIdx] + "%";
-        document.getElementById('status').innerText = "SYSTEMS ONLINE | 12H-12H TACTICAL";
+        document.getElementById('status').innerText = "SYSTEMS ONLINE";
 
     } catch (e) {
+        console.error("Error loading data:", e);
         document.getElementById('status').innerText = "ERROR LOADING DATA";
     }
 }
 loadTacticalData();
-
-    <a href="index.html" class="block text-center mt-4 p-3 bg-neutral-800 border border-orange-700 text-orange-400 rounded-xl hover:bg-neutral-700 transition">
-  กลับสู่ศูนย์บัญชาการหลัก
-</a>
-    
 </script>
 </body>
 </html>
