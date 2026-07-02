@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BKK Air Force One - Tactical</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-black text-orange-500 font-sans p-4 pb-10">
+<div class="max-w-md mx-auto space-y-4">
+
+<!-- Header -->
+<header class="text-center pb-4 border-b border-orange-900">
+<h1 class="font-bold text-orange-500 tracking-[0.2em] text-lg uppercase">BKK Air Force One</h1>
+<p id="status" class="text-[9px] text-orange-700 uppercase mt-1 tracking-widest">กำลังดึงข้อมูลดาวเทียม...</p>
+</header>
+
+<!-- Current Status -->
+<div>
+<h2 class="font-bold text-[10px] uppercase text-orange-700 tracking-widest mb-2 border-l-2 border-orange-700 pl-2">Current Status (ปัจจุบัน)</h2>
+<div class="grid grid-cols-2 gap-3">
+<div class="bg-neutral-900 p-4 rounded-xl border border-orange-900 text-center">
+<div class="text-[10px] uppercase text-gray-400 mb-1">ฝน (mm/h) / โอกาส</div>
+<div class="flex justify-center items-end gap-1">
+<div id="cur-rain" class="text-3xl font-bold text-blue-400">-</div>
+<div id="cur-prob" class="text-lg font-bold text-cyan-400 mb-1">-%</div>
+</div>
+<div class="text-[9px] uppercase text-blue-500 mt-1">มิลลิเมตร | เปอร์เซ็นต์</div>
+</div>
+<div class="bg-neutral-900 p-4 rounded-xl border border-orange-900 text-center">
+<div class="text-[10px] uppercase text-gray-400 mb-1">ทิศทางลม / ความเร็ว</div>
+<div class="flex justify-center items-end gap-1">
+<div id="cur-dir" class="text-3xl font-bold text-orange-500">-</div>
+<div id="cur-wind" class="text-lg font-bold text-orange-400 mb-1">-</div>
+</div>
+<div class="text-[9px] uppercase text-orange-600 mt-1">กิโลเมตร/ชั่วโมง</div>
+</div>
+</div>
+</div>
+
+<!-- Live Radar (Windy แบบออริจินัล คลีนๆ) -->
+<div class="pt-2">
+<h2 class="font-bold text-[10px] uppercase text-orange-700 tracking-widest mb-2 border-l-2 border-orange-700 pl-2">Live Tactical Radar</h2>
+<div class="bg-neutral-900 p-1 rounded-xl border border-orange-900 relative z-0 overflow-hidden" style="height: 280px;">
+    <!-- ตัวดึงแผนที่ Windy -->
+    <iframe width="100%" height="100%" src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=10&overlay=rain&product=ecmwf&level=surface&lat=13.75&lon=100.50&message=true" frameborder="0"></iframe>
+</div>
+</div>
+
+<!-- 8-Hour Forecast -->
+<div class="pt-2">
+<h2 class="font-bold text-[10px] uppercase text-orange-700 tracking-widest mb-2 border-l-2 border-orange-700 pl-2">8-Hour Tactical Forecast</h2>
+<div id="forecast-list" class="space-y-2"></div>
+</div>
+
+<button onclick="location.reload()" class="w-full mt-4 bg-orange-900 py-3 rounded-xl text-xs font-bold uppercase text-white hover:bg-orange-800">อัปเดตข้อมูลทั้งหมด</button>
+</div>
+
+<script>
+function getWindDir(deg) {
+const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+return dirs[Math.round((deg % 360) / 45) % 8];
+}
+
+async function loadTacticalData() {
+try {
+const url = 'https://api.open-meteo.com/v1/forecast?latitude=13.75&longitude=100.50&current=precipitation,wind_speed_10m,wind_direction_10m&hourly=precipitation_probability,wind_speed_10m,wind_direction_10m&timezone=Asia%2FBangkok';
+const res = await fetch(url);
+const data = await res.json();
+if (data.error) throw new Error();
+
+const currentHourPrefix = data.current.time.substring(0, 13);
+let currentIndex = data.hourly.time.findIndex(t => t.startsWith(currentHourPrefix));
+if (currentIndex === -1) currentIndex = 0;
+
+document.getElementById('cur-rain').innerText = data.current.precipitation.toFixed(1);
+document.getElementById('cur-prob').innerText = data.hourly.precipitation_probability[currentIndex] + "%";
+document.getElementById('cur-wind').innerText = Math.round(data.current.wind_speed_10m);
+document.getElementById('cur-dir').innerText = getWindDir(data.current.wind_direction_10m);
+
+const fcList = document.getElementById('forecast-list');
+let html = '';
+for(let i = 1; i <= 8; i++) {
+const targetIndex = currentIndex + i;
+if (!data.hourly.time[targetIndex]) continue;
+const d = new Date(data.hourly.time[targetIndex]);
+const timeStr = d.getHours().toString().padStart(2, '0') + ':00';
+const prob = data.hourly.precipitation_probability[targetIndex];
+const wind = Math.round(data.hourly.wind_speed_10m[targetIndex]);
+const dir = getWindDir(data.hourly.wind_direction_10m[targetIndex]);
+const probColor = prob > 20 ? 'text-blue-400 font-bold' : 'text-gray-500';
+
+html += `<div class="bg-neutral-900 p-3 rounded-xl border border-orange-900 flex justify-between items-center text-xs">
+<div class="font-bold text-white w-12 text-center bg-black py-1 rounded border border-orange-900">${timeStr}</div>
+<div class="flex-1 text-center ${probColor}">โอกาสฝน: ${prob}%</div>
+<div class="w-20 text-right text-orange-400">ลม: ${dir} ${wind}</div></div>`;
+}
+fcList.innerHTML = html;
+document.getElementById('status').innerText = "เรดาร์ออนไลน์ | อัปเดต: " + new Date().toLocaleTimeString('th-TH');
+document.getElementById('status').classList.replace('text-orange-700', 'text-green-500');
+} catch (error) {
+document.getElementById('status').innerText = "เชื่อมต่อล้มเหลว";
+document.getElementById('status').classList.replace('text-orange-700', 'text-red-500');
+}
+}
+loadTacticalData();
+</script>
+</body>
+</html>
